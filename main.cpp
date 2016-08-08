@@ -10,9 +10,10 @@
 #pragma comment(lib, "ws2_32.lib")
 
 
-int Initialize(WSADATA* wsaData = nullptr);
-int CreateSocket(SOCKET* sock = nullptr);
-void Finalize();
+int Initialize(WSADATA* wsaData);
+int CreateSocket(SOCKET* sock);
+int SetupSocket(SOCKET* socket, sockaddr_in* addr, sockaddr_in* client);
+void Finalize(SOCKET* socket);
 
 
 int Initialize(WSADATA* wsaData) 
@@ -73,8 +74,20 @@ int CreateSocket(SOCKET* sock)
 }
 
 
-void Finalize() 
+int SetupSocket(SOCKET* socket, sockaddr_in* addr, sockaddr_in* client)
 {
+	addr->sin_family = AF_INET;
+	addr->sin_port = htons(64864);
+	addr->sin_addr.S_un.S_addr = INADDR_ANY;
+	bind(*socket, (sockaddr*)addr, sizeof(addr));
+
+	return 0;
+}
+
+
+void Finalize(SOCKET* socket)
+{
+	closesocket(*socket);
 	WSACleanup();
 }
 
@@ -84,15 +97,30 @@ Main
 ---------------------------------------*/
 int main(int argc, char* argv[]) 
 {
-	/* initialization */
 	WSADATA wsaData;
+	SOCKET sock, sock0;
+	sockaddr_in addr;
+	sockaddr_in client;
+	int len = 0;
+
+	/* initialization */
 	if(Initialize(&wsaData) != 0)	return -1;
 
 	/* creating the socket */
-	SOCKET sock;
-	if (CreateSocket(&sock) != 0)	return -1;
+	if (CreateSocket(&sock0) != 0)	return -1;
+	if (SetupSocket(&sock0, &addr, &client) != 0)	return -1;
+
+	/* TCPクライアントからの接続要求を待てる状態 ←　英語にできません（泣）*/
+	listen(sock0, 5);
+
+	/* TCPクライアントからの接続要求を受け付ける */
+	len = sizeof(client);
+	sock = accept(sock0, (sockaddr*)&client, &len);
+
+	/* submitting 5 characters to the aim */
+	send(sock, "Hello TCP/IP World!", 5, 0);
 
 	/* finish */
-	Finalize();
+	Finalize(&sock);
 	return 0;
 }
